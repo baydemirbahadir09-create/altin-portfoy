@@ -1,0 +1,409 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0b0d10">
+<title>Altın Portföy</title>
+<style>
+:root{--bg:#090b0e;--card:#12151a;--line:#242932;--text:#f6f7f8;--muted:#8e96a3;--green:#40d99b;--red:#ff6675}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display","Segoe UI",sans-serif}
+.app{max-width:520px;margin:auto;padding:22px 16px 100px}.top{display:flex;justify-content:space-between;align-items:center;margin-bottom:18px}
+.brand{font-size:20px;font-weight:800}.live{font-size:11px;color:var(--green);background:#103527;padding:6px 9px;border-radius:99px}
+.hero{background:linear-gradient(145deg,#171b21,#101216);border:1px solid var(--line);border-radius:24px;padding:21px;margin-bottom:14px}
+.label{color:var(--muted);font-size:12px}.total{font-size:36px;font-weight:800;letter-spacing:-1px;margin:7px 0}.status{font-size:12px;color:var(--muted)}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:17px}.mini{background:#0c0f13;border:1px solid #20242b;border-radius:15px;padding:12px}.mini b{display:block;margin-top:4px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:21px;padding:16px;margin:14px 0}.head{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}.head b{font-size:16px}
+button{border:0;border-radius:12px;padding:10px 13px;font-weight:750;background:#f3f4f6;color:#101114;cursor:pointer}.secondary{background:#242a33;color:#fff}
+.row{display:flex;justify-content:space-between;align-items:center;padding:14px 0;border-bottom:1px solid var(--line)}.row:last-child{border-bottom:0}
+.name{font-weight:700}.sub{font-size:12px;color:var(--muted);margin-top:4px}.right{text-align:right}.sell{font-weight:750}.buy{font-size:11px;color:var(--muted);margin-top:3px}
+.empty{text-align:center;color:var(--muted);padding:22px 5px;font-size:13px}
+.modal{display:none;position:fixed;inset:0;background:#000b;align-items:flex-end;z-index:5}.sheet{background:#15181d;width:100%;max-width:520px;margin:auto;border-radius:25px 25px 0 0;padding:20px 18px 28px;border-top:1px solid #2b3039}
+select,input{width:100%;padding:14px;border-radius:13px;border:1px solid #303640;background:#0d1014;color:#fff;font-size:16px;margin:6px 0 15px}
+.actions{display:flex;gap:8px}.actions button{flex:1}.danger{color:#ff7180;background:#2a171b}
+.toast{position:fixed;left:50%;bottom:82px;transform:translateX(-50%);background:#f2f3f5;color:#111;padding:10px 14px;border-radius:99px;font-size:13px;display:none;z-index:9}
+footer{text-align:center;color:#5f6670;font-size:10px;margin-top:22px}
+</style>
+</head>
+<body>
+<main class="app">
+<div class="top"><div class="brand">₺ Altın Portföy</div><div class="live" id="live">● CANLI</div></div>
+
+<section class="hero">
+<div class="label">PORTFÖYÜN GÜNCEL SATIŞ DEĞERİ</div>
+<div id="total" class="total">₺0,00</div>
+<div id="updated" class="status">Veriler yükleniyor…</div>
+<div class="grid">
+<div class="mini"><span class="label">Varlık sayısı</span><b id="count">0</b></div>
+<div class="mini"><span class="label">Son yenileme</span><b id="time">—</b></div>
+</div>
+</section>
+
+<section class="card">
+<div class="head"><b>Varlıklarım</b><button type="button" onclick="openModal()">＋ Ekle</button></div>
+<div id="assets"></div>
+</section>
+
+<section class="card">
+<div class="head"><b>Canlı Kurlar</b><button type="button" class="secondary" onclick="load()">↻</button></div>
+<div id="prices"><div class="empty">Veriler yükleniyor…</div></div>
+</section>
+
+<footer>Fiyat kaynağı: Altınkaynak • Bilgi amaçlıdır</footer>
+</main>
+
+<div class="modal" id="modal">
+<div class="sheet">
+<h2 style="margin-top:0">Varlık ekle</h2>
+<label class="label">Varlık</label>
+<select id="type"></select>
+<label class="label">Miktar</label>
+<input id="qty" type="number" step="0.001" min="0" placeholder="Örn. 10">
+<div class="actions">
+<button type="button" class="secondary" onclick="closeModal()">Vazgeç</button>
+<button type="button" onclick="addAsset()">Portföye Ekle</button>
+</div>
+</div>
+</div>
+
+<div id="toast" class="toast"></div>
+
+<script>
+const API={prices:"/api/prices"};
+
+const products=[
+  "Gram Altın","Çeyrek Altın","Yarım Altın","Tam Altın",
+  "Ata Cumhuriyet","Külçe Altın","USD","EUR","GBP"
+];
+
+let prices={};
+let assets=[];
+
+try{
+  assets=JSON.parse(localStorage.getItem("altinAssets")||"[]");
+  if(!Array.isArray(assets)) assets=[];
+}catch(e){assets=[];}
+
+const type=document.getElementById("type");
+products.forEach(x=>type.add(new Option(x,x)));
+
+const fmt=n=>new Intl.NumberFormat("tr-TR",{
+  style:"currency",
+  currency:"TRY",
+  maximumFractionDigits:2
+}).format(Number(n)||0);
+
+function num(v){
+  if(typeof v==="number") return v;
+  if(v==null) return NaN;
+
+  let s=String(v).trim().replace(/\s/g,"");
+
+  if(s.includes(",")){
+    s=s.replace(/\./g,"").replace(",",".");
+  }else{
+    s=s.replace(/,/g,"");
+  }
+
+  return parseFloat(s);
+}
+
+/*
+  API'miz iki farklı yapı döndürebilir:
+  1) { "Gram Altın": {buy,sell,code} }
+  2) { ... } şeklinde dizi / iç içe nesne
+  Bu fonksiyon ikisini de güvenli biçimde normalize eder.
+*/
+function normalize(data,out={}){
+  if(!data) return out;
+
+  if(Array.isArray(data)){
+    data.forEach(item=>{
+      if(!item || typeof item!=="object") return;
+
+      const name=item.Aciklama??item.aciklama??item.name??item.Name??item.Kod??item.code??item.Code;
+      const code=item.Kod??item.kod??item.code??item.Code??item.symbol??item.Symbol;
+      const buy=num(item.Alis??item.alis??item.buy??item.Buy??item.Bid);
+      const sell=num(item.Satis??item.satis??item.sell??item.Sell??item.Ask);
+
+      if(isFinite(buy)&&isFinite(sell)){
+        const p={buy,sell,code:code?String(code).trim():"",name:name?String(name).trim():""};
+        if(name) out[String(name).trim()]=p;
+        if(code) out[String(code).trim()]=p;
+      }
+
+      Object.values(item).forEach(v=>{
+        if(v&&typeof v==="object") normalize(v,out);
+      });
+    });
+    return out;
+  }
+
+  if(typeof data==="object"){
+    Object.entries(data).forEach(([key,value])=>{
+      if(value&&typeof value==="object"&&!Array.isArray(value)){
+        const code=value.Kod??value.kod??value.code??value.Code??value.symbol??value.Symbol;
+        const name=value.Aciklama??value.aciklama??value.name??value.Name??key;
+        const buy=num(value.Alis??value.alis??value.buy??value.Buy??value.Bid);
+        const sell=num(value.Satis??value.satis??value.sell??value.Sell??value.Ask);
+
+        if(isFinite(buy)&&isFinite(sell)){
+          const p={
+            buy,
+            sell,
+            code:code?String(code).trim():"",
+            name:name?String(name).trim():String(key).trim()
+          };
+
+          out[String(key).trim()]=p;
+          if(name) out[String(name).trim()]=p;
+          if(code) out[String(code).trim()]=p;
+        }else{
+          normalize(value,out);
+        }
+      }
+    });
+  }
+
+  return out;
+}
+
+function get(n){
+  const codes={
+    "Gram Altın":"PGA",
+    "Çeyrek Altın":"PC",
+    "Yarım Altın":"PY",
+    "Tam Altın":"PT",
+    "Ata Cumhuriyet":"PA",
+    "Külçe Altın":"CH_T",
+    "USD":"USD",
+    "EUR":"EUR",
+    "GBP":"GBP"
+  };
+
+  const names={
+    "Gram Altın":["Gram Altın","Gram Altın ","Has","Has Altın","Gram"],
+    "Çeyrek Altın":["Çeyrek Altın","Çeyrek"],
+    "Yarım Altın":["Yarım Altın","Yarım"],
+    "Tam Altın":["Tam Altın","Tam","Teklik"],
+    "Ata Cumhuriyet":["Ata Cumhuriyet","Ata","Cumhuriyet Altın"],
+    "Külçe Altın":["Külçe Altın","Külçe"],
+    "USD":["USD","Dolar","Amerikan Doları"],
+    "EUR":["EUR","Euro","Avrupa Para Birimi"],
+    "GBP":["GBP","Sterlin","İngiliz Sterlini"]
+  };
+
+  const code=codes[n];
+
+  if(code && prices[code]) return prices[code];
+
+  if(code){
+    for(const key of Object.keys(prices)){
+      const p=prices[key];
+      if(p && p.code===code) return p;
+    }
+  }
+
+  for(const name of (names[n]||[n])){
+    if(prices[name]) return prices[name];
+  }
+
+  for(const key of Object.keys(prices)){
+    const p=prices[key];
+    const k=String(key).toLowerCase();
+    if((names[n]||[n]).some(x=>k===String(x).toLowerCase())) return p;
+  }
+
+  return null;
+}
+
+function render(){
+  let total=0;
+  let html="";
+
+  assets.forEach((a,i)=>{
+    const p=get(a.type);
+    const qty=Number(a.qty)||0;
+    const value=p?p.sell*qty:0;
+    total+=value;
+
+    html+=`
+      <div class="row">
+        <div>
+          <div class="name">${escapeHtml(a.type)}</div>
+          <div class="sub">${qty} adet</div>
+        </div>
+        <div class="right">
+          <div class="sell">${p?fmt(value):"—"}</div>
+          <div class="sub">${p?"Silmek için dokun":"Fiyat bekleniyor"}</div>
+        </div>
+      </div>`;
+  });
+
+  document.getElementById("assets").innerHTML=
+    html ||
+    '<div class="empty">Henüz varlık eklemedin.<br>Yukarıdaki <b>＋ Ekle</b> butonuna bas.</div>';
+
+  document.getElementById("total").textContent=fmt(total);
+  document.getElementById("count").textContent=assets.length;
+
+  document.querySelectorAll("#assets .row").forEach((el,i)=>{
+    el.onclick=()=>{
+      if(confirm(assets[i].type+" varlığını silmek istiyor musun?")){
+        assets.splice(i,1);
+        save(false);
+        render();
+      }
+    };
+  });
+}
+
+function renderPrices(){
+  let html="";
+
+  products.forEach(n=>{
+    const p=get(n);
+
+    if(p){
+      html+=`
+        <div class="row">
+          <div>
+            <div class="name">${escapeHtml(n)}</div>
+            <div class="sub">Alış / Satış</div>
+          </div>
+          <div class="right">
+            <div class="buy">${fmt(p.buy)}</div>
+            <div class="sell">${fmt(p.sell)}</div>
+          </div>
+        </div>`;
+    }
+  });
+
+  document.getElementById("prices").innerHTML=
+    html || '<div class="empty">Canlı veri alınamadı.</div>';
+}
+
+async function load(){
+  document.getElementById("updated").textContent="Altınkaynak verisi alınıyor…";
+
+  try{
+    const r=await fetch(API.prices,{cache:"no-store"});
+
+    if(!r.ok) throw new Error("API HTTP "+r.status);
+
+    const data=await r.json();
+
+    prices={};
+
+    /*
+      API'den gelen:
+      gold -> altınlar
+      currency -> dövizler
+      data -> varsa ek veriler
+    */
+    normalize(data.gold,prices);
+    normalize(data.currency,prices);
+    normalize(data.data,prices);
+
+    render();
+    renderPrices();
+
+    const d=new Date();
+
+    document.getElementById("time").textContent=
+      d.toLocaleTimeString("tr-TR",{
+        hour:"2-digit",
+        minute:"2-digit",
+        second:"2-digit"
+      });
+
+    document.getElementById("updated").textContent=
+      "Son güncelleme: "+d.toLocaleString("tr-TR");
+
+    document.getElementById("live").textContent="● CANLI";
+
+  }catch(e){
+    console.error("Fiyat yükleme hatası:",e);
+
+    document.getElementById("live").textContent="● BAĞLANTI YOK";
+    document.getElementById("updated").textContent=
+      "Canlı veri bağlantısı kurulamadı.";
+
+    render();
+    renderPrices();
+  }
+}
+
+function save(show=true){
+  localStorage.setItem("altinAssets",JSON.stringify(assets));
+  if(show) showToast("Portföy kaydedildi");
+}
+
+function openModal(){
+  const m=document.getElementById("modal");
+  m.style.display="flex";
+  document.body.style.overflow="hidden";
+
+  setTimeout(()=>{
+    document.getElementById("qty").focus();
+  },100);
+}
+
+function closeModal(){
+  document.getElementById("modal").style.display="none";
+  document.body.style.overflow="";
+}
+
+function addAsset(){
+  const q=parseFloat(document.getElementById("qty").value);
+  const selected=type.value;
+
+  if(!selected){
+    showToast("Önce varlık seç");
+    return;
+  }
+
+  if(!Number.isFinite(q)||q<=0){
+    showToast("Geçerli bir miktar gir");
+    return;
+  }
+
+  assets.push({
+    type:selected,
+    qty:q
+  });
+
+  save(false);
+  render();
+
+  document.getElementById("qty").value="";
+  closeModal();
+
+  showToast(selected+" portföye eklendi");
+}
+
+function showToast(t){
+  const x=document.getElementById("toast");
+  x.textContent=t;
+  x.style.display="block";
+
+  setTimeout(()=>{
+    x.style.display="none";
+  },1800);
+}
+
+function escapeHtml(value){
+  return String(value)
+    .replaceAll("&","&amp;")
+    .replaceAll("<","&lt;")
+    .replaceAll(">","&gt;")
+    .replaceAll('"',"&quot;")
+    .replaceAll("'","&#039;");
+}
+
+render();
+load();
+setInterval(load,30000);
+</script>
+</body>
+</html>
