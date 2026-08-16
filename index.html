@@ -62,9 +62,32 @@ products.forEach(x=>type.add(new Option(x,x)));
 const fmt=n=>new Intl.NumberFormat("tr-TR",{style:"currency",currency:"TRY",maximumFractionDigits:2}).format(n||0);
 
 function get(n){
+  const codes={
+    "Gram Altın":"PGA",
+    "Çeyrek Altın":"PC",
+    "Yarım Altın":"PY",
+    "Tam Altın":"PT",
+    "Ata Cumhuriyet":"PA",
+    "Külçe Altın":"CH_T",
+    "USD":"USD",
+    "EUR":"EUR",
+    "GBP":"GBP"
+  };
+
+  const code=codes[n];
+
+  for(const key in prices){
+    const p=prices[key];
+
+    if(code && p.code===code){
+      return p;
+    }
+  }
+
   for(const a of aliases[n]||[n]){
     if(prices[a]) return prices[a];
   }
+
   return null;
 }
 
