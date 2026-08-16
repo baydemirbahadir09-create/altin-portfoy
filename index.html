@@ -45,15 +45,15 @@ const products=["Gram Altın","Çeyrek Altın","Yarım Altın","Tam Altın","Ata
 let prices={},assets=JSON.parse(localStorage.getItem("altinAssets")||"[]");
 
 const aliases={
-"Gram Altın":["Gram Altın","Has Altın","Gram"],
+"Gram Altın":["Gram Altın","Gram Altın ","Has Altın","Gram"],
 "Çeyrek Altın":["Çeyrek Altın","Çeyrek"],
 "Yarım Altın":["Yarım Altın","Yarım"],
-"Tam Altın":["Tam Altın","Tam"],
+"Tam Altın":["Tam Altın","Tam","Teklik"],
 "Ata Cumhuriyet":["Ata Cumhuriyet","Ata","Cumhuriyet Altın"],
 "Külçe Altın":["Külçe Altın","Külçe"],
-USD:["USD","Dolar"],
-EUR:["EUR","Euro"],
-GBP:["GBP","Sterlin"]
+USD:["USD","Dolar","Amerikan Doları"],
+EUR:["EUR","Euro","Avrupa Para Birimi"],
+GBP:["GBP","Sterlin","İngiliz Sterlini"]
 };
 
 const type=document.getElementById("type");
