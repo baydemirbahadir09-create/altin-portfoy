@@ -22,33 +22,44 @@ module.exports = async (req, res) => {
       currencyResponse.json()
     ]);
 
-    // Altınkaynak Türkçe sayı formatını sayıya çevirir.
-    // Örn: "6.656,76" -> 6656.76
     function parsePrice(value) {
-      if (typeof value === "number") return value;
+      if (typeof value === "number") {
+        return value;
+      }
 
       if (value === null || value === undefined) {
         return null;
       }
 
-      let s = String(value).trim();
+      let s = String(value)
+        .trim()
+        .replace(/\s/g, "");
 
-      if (!s) return null;
+      if (!s) {
+        return null;
+      }
 
-      s = s.replace(/\s/g, "");
-
-      // Türkçe format: 6.656,76
+      /*
+        Türkçe sayı formatı:
+        6.753,94 -> 6753.94
+      */
       if (s.includes(",")) {
-        s = s.replace(/\./g, "").replace(",", ".");
+        s = s
+          .replace(/\./g, "")
+          .replace(",", ".");
       }
 
       const number = Number(s);
 
-      return Number.isFinite(number) ? number : null;
+      return Number.isFinite(number)
+        ? number
+        : null;
     }
 
     function clean(items) {
-      if (!Array.isArray(items)) return [];
+      if (!Array.isArray(items)) {
+        return [];
+      }
 
       return items
         .map(item => ({
@@ -76,50 +87,35 @@ module.exports = async (req, res) => {
         );
     }
 
+    /*
+      Altınkaynak'tan gelen TÜM altın ürünleri.
+      
+      Artık:
+      GA
+      PC
+      PY
+      PT
+      PA
+      CH_T
+      
+      gibi sabit kod listesi kullanmıyoruz.
+
+      Böylece Altınkaynak'a yeni bir altın ürünü
+      eklenirse otomatik olarak API'den gelir.
+    */
     const goldData = clean(gold);
+
+    /*
+      Dövizleri de otomatik olarak alıyoruz.
+    */
     const currencyData = clean(currency);
 
     /*
-      ALTINKAYNAK KODLARI
-
-      GA   = Gram Altın
-      PC   = Çeyrek
-      PY   = Yarım
-      PT   = Teklik / Tam
-      PA   = Ata Cumhuriyet
-      CH_T = Külçe
-
-      USD  = Dolar
-      EUR  = Euro
-      GBP  = Sterlin
+      Altınkaynak'ın güncelleme zamanını bul.
     */
-
-    const goldCodes = [
-      "GA",
-      "PC",
-      "PY",
-      "PT",
-      "PA",
-      "CH_T"
-    ];
-
-    const currencyCodes = [
-      "USD",
-      "EUR",
-      "GBP"
-    ];
-
-    const selectedGold = goldData.filter(item =>
-      goldCodes.includes(item.code)
-    );
-
-    const selectedCurrency = currencyData.filter(item =>
-      currencyCodes.includes(item.code)
-    );
-
     const all = [
-      ...selectedGold,
-      ...selectedCurrency
+      ...goldData,
+      ...currencyData
     ];
 
     const updateTimes = all
@@ -131,7 +127,10 @@ module.exports = async (req, res) => {
         ? updateTimes.sort().at(-1)
         : null;
 
-    // Vercel/CDN önbelleğini kapat.
+    /*
+      Vercel / CDN cache kapalı.
+      Her istek Altınkaynak'tan güncel veri almaya çalışır.
+    */
     res.setHeader(
       "Cache-Control",
       "no-store, no-cache, must-revalidate, proxy-revalidate"
@@ -149,10 +148,14 @@ module.exports = async (req, res) => {
 
     return res.status(200).json({
       source: "Altınkaynak",
+
       updatedAt: updatedAt,
+
       fetchedAt: new Date().toISOString(),
-      gold: selectedGold,
-      currency: selectedCurrency
+
+      gold: goldData,
+
+      currency: currencyData
     });
 
   } catch (error) {
@@ -169,8 +172,12 @@ module.exports = async (req, res) => {
 
     return res.status(500).json({
       source: "Altınkaynak",
-      error: "Altınkaynak verisi alınamadı",
-      message: error.message
+
+      error:
+        "Altınkaynak verisi alınamadı",
+
+      message:
+        error.message
     });
   }
 };
