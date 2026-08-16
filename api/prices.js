@@ -10,13 +10,11 @@ module.exports = async (req, res) => {
     ]);
 
     if (!goldResponse.ok) {
-      throw new Error("Altınkaynak Gold servisi HTTP " + goldResponse.status);
+      throw new Error("Gold HTTP " + goldResponse.status);
     }
 
     if (!currencyResponse.ok) {
-      throw new Error(
-        "Altınkaynak Currency servisi HTTP " + currencyResponse.status
-      );
+      throw new Error("Currency HTTP " + currencyResponse.status);
     }
 
     const [gold, currency] = await Promise.all([
@@ -24,25 +22,57 @@ module.exports = async (req, res) => {
       currencyResponse.json()
     ]);
 
+    // Altınkaynak Türkçe sayı formatını sayıya çevirir.
+    // Örn: "6.656,76" -> 6656.76
+    function parsePrice(value) {
+      if (typeof value === "number") return value;
+
+      if (value === null || value === undefined) {
+        return null;
+      }
+
+      let s = String(value).trim();
+
+      if (!s) return null;
+
+      s = s.replace(/\s/g, "");
+
+      // Türkçe format: 6.656,76
+      if (s.includes(",")) {
+        s = s.replace(/\./g, "").replace(",", ".");
+      }
+
+      const number = Number(s);
+
+      return Number.isFinite(number) ? number : null;
+    }
+
     function clean(items) {
       if (!Array.isArray(items)) return [];
 
       return items
-        .map((item) => ({
-          code: item.Kod ? String(item.Kod).trim() : "",
-          name: item.Aciklama ? String(item.Aciklama).trim() : "",
-          buy: Number(item.Alis),
-          sell: Number(item.Satis),
+        .map(item => ({
+          code: item.Kod
+            ? String(item.Kod).trim()
+            : "",
+
+          name: item.Aciklama
+            ? String(item.Aciklama).trim()
+            : "",
+
+          buy: parsePrice(item.Alis),
+
+          sell: parsePrice(item.Satis),
+
           updatedAt: item.GuncellenmeZamani
             ? String(item.GuncellenmeZamani).trim()
             : ""
         }))
-        .filter(
-          (item) =>
-            item.code &&
-            item.name &&
-            Number.isFinite(item.buy) &&
-            Number.isFinite(item.sell)
+        .filter(item =>
+          item.code &&
+          item.name &&
+          item.buy !== null &&
+          item.sell !== null
         );
     }
 
@@ -50,13 +80,18 @@ module.exports = async (req, res) => {
     const currencyData = clean(currency);
 
     /*
-      Altınkaynak ürün kodları:
+      ALTINKAYNAK KODLARI
+
       GA   = Gram Altın
-      PC   = Çeyrek Altın
-      PY   = Yarım Altın
-      PT   = Tam/Teklik Altın
+      PC   = Çeyrek
+      PY   = Yarım
+      PT   = Teklik / Tam
       PA   = Ata Cumhuriyet
-      CH_T = Külçe Altın
+      CH_T = Külçe
+
+      USD  = Dolar
+      EUR  = Euro
+      GBP  = Sterlin
     */
 
     const goldCodes = [
@@ -74,18 +109,21 @@ module.exports = async (req, res) => {
       "GBP"
     ];
 
-    const selectedGold = goldData.filter((item) =>
+    const selectedGold = goldData.filter(item =>
       goldCodes.includes(item.code)
     );
 
-    const selectedCurrency = currencyData.filter((item) =>
+    const selectedCurrency = currencyData.filter(item =>
       currencyCodes.includes(item.code)
     );
 
-    const all = [...selectedGold, ...selectedCurrency];
+    const all = [
+      ...selectedGold,
+      ...selectedCurrency
+    ];
 
     const updateTimes = all
-      .map((item) => item.updatedAt)
+      .map(item => item.updatedAt)
       .filter(Boolean);
 
     const updatedAt =
@@ -93,9 +131,21 @@ module.exports = async (req, res) => {
         ? updateTimes.sort().at(-1)
         : null;
 
-    res.setHeader("Cache-Control", "no-store, max-age=0");
-    res.setHeader("CDN-Cache-Control", "no-store");
-    res.setHeader("Vercel-CDN-Cache-Control", "no-store");
+    // Vercel/CDN önbelleğini kapat.
+    res.setHeader(
+      "Cache-Control",
+      "no-store, no-cache, must-revalidate, proxy-revalidate"
+    );
+
+    res.setHeader(
+      "CDN-Cache-Control",
+      "no-store"
+    );
+
+    res.setHeader(
+      "Vercel-CDN-Cache-Control",
+      "no-store"
+    );
 
     return res.status(200).json({
       source: "Altınkaynak",
@@ -106,9 +156,16 @@ module.exports = async (req, res) => {
     });
 
   } catch (error) {
-    console.error("Altınkaynak API hatası:", error);
 
-    res.setHeader("Cache-Control", "no-store");
+    console.error(
+      "Altınkaynak API hatası:",
+      error
+    );
+
+    res.setHeader(
+      "Cache-Control",
+      "no-store"
+    );
 
     return res.status(500).json({
       source: "Altınkaynak",
