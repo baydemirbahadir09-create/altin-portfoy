@@ -1,56 +1,117 @@
 module.exports = async (req, res) => {
   try {
     const [goldResponse, currencyResponse] = await Promise.all([
-      fetch("https://static.altinkaynak.com/public/Gold"),
-      fetch("https://static.altinkaynak.com/public/Currency")
+      fetch("https://static.altinkaynak.com/public/Gold", {
+        cache: "no-store"
+      }),
+      fetch("https://static.altinkaynak.com/public/Currency", {
+        cache: "no-store"
+      })
     ]);
 
-    if (!goldResponse.ok || !currencyResponse.ok) {
-      throw new Error("Altınkaynak servisine bağlanılamadı");
+    if (!goldResponse.ok) {
+      throw new Error("Altınkaynak Gold servisi HTTP " + goldResponse.status);
     }
 
-    const gold = await goldResponse.json();
-    const currency = await currencyResponse.json();
-
-    const goldData = {};
-    const currencyData = {};
-
-    for (const item of gold) {
-      const name = item.Aciklama;
-      if (!name) continue;
-
-      goldData[name] = {
-        buy: item.Alis,
-        sell: item.Satis,
-        code: item.Kod,
-        updated: item.GuncellenmeZamani
-      };
+    if (!currencyResponse.ok) {
+      throw new Error(
+        "Altınkaynak Currency servisi HTTP " + currencyResponse.status
+      );
     }
 
-    for (const item of currency) {
-      const name = item.Aciklama || item.Kod;
-      if (!name) continue;
+    const [gold, currency] = await Promise.all([
+      goldResponse.json(),
+      currencyResponse.json()
+    ]);
 
-      currencyData[name] = {
-        buy: item.Alis,
-        sell: item.Satis,
-        code: item.Kod,
-        updated: item.GuncellenmeZamani
-      };
+    function clean(items) {
+      if (!Array.isArray(items)) return [];
+
+      return items
+        .map((item) => ({
+          code: item.Kod ? String(item.Kod).trim() : "",
+          name: item.Aciklama ? String(item.Aciklama).trim() : "",
+          buy: Number(item.Alis),
+          sell: Number(item.Satis),
+          updatedAt: item.GuncellenmeZamani
+            ? String(item.GuncellenmeZamani).trim()
+            : ""
+        }))
+        .filter(
+          (item) =>
+            item.code &&
+            item.name &&
+            Number.isFinite(item.buy) &&
+            Number.isFinite(item.sell)
+        );
     }
 
-    res.setHeader("Cache-Control", "no-store");
+    const goldData = clean(gold);
+    const currencyData = clean(currency);
 
-    res.status(200).json({
-      gold: goldData,
-      currency: currencyData,
-      updatedAt: new Date().toISOString()
+    /*
+      Altınkaynak ürün kodları:
+      GA   = Gram Altın
+      PC   = Çeyrek Altın
+      PY   = Yarım Altın
+      PT   = Tam/Teklik Altın
+      PA   = Ata Cumhuriyet
+      CH_T = Külçe Altın
+    */
+
+    const goldCodes = [
+      "GA",
+      "PC",
+      "PY",
+      "PT",
+      "PA",
+      "CH_T"
+    ];
+
+    const currencyCodes = [
+      "USD",
+      "EUR",
+      "GBP"
+    ];
+
+    const selectedGold = goldData.filter((item) =>
+      goldCodes.includes(item.code)
+    );
+
+    const selectedCurrency = currencyData.filter((item) =>
+      currencyCodes.includes(item.code)
+    );
+
+    const all = [...selectedGold, ...selectedCurrency];
+
+    const updateTimes = all
+      .map((item) => item.updatedAt)
+      .filter(Boolean);
+
+    const updatedAt =
+      updateTimes.length > 0
+        ? updateTimes.sort().at(-1)
+        : null;
+
+    res.setHeader("Cache-Control", "no-store, max-age=0");
+    res.setHeader("CDN-Cache-Control", "no-store");
+    res.setHeader("Vercel-CDN-Cache-Control", "no-store");
+
+    return res.status(200).json({
+      source: "Altınkaynak",
+      updatedAt: updatedAt,
+      fetchedAt: new Date().toISOString(),
+      gold: selectedGold,
+      currency: selectedCurrency
     });
 
   } catch (error) {
     console.error("Altınkaynak API hatası:", error);
 
-    res.status(500).json({
+    res.setHeader("Cache-Control", "no-store");
+
+    return res.status(500).json({
+      source: "Altınkaynak",
       error: "Altınkaynak verisi alınamadı",
       message: error.message
     });
