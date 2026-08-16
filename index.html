@@ -278,7 +278,13 @@ footer{
 
   <div class="head">
     <b>Varlıklarım</b>
-    <button type="button" onclick="openModal()">＋ Ekle</button>
+
+    <button
+      type="button"
+      onclick="openModal()">
+      ＋ Ekle
+    </button>
+
   </div>
 
   <div id="assets"></div>
@@ -289,6 +295,7 @@ footer{
 <section class="card">
 
   <div class="head">
+
     <b>Canlı Kurlar</b>
 
     <button
@@ -297,12 +304,15 @@ footer{
       onclick="load()">
       ↻
     </button>
+
   </div>
 
   <div id="prices">
+
     <div class="empty">
       Veriler yükleniyor…
     </div>
+
   </div>
 
 </section>
@@ -373,73 +383,30 @@ const API = {
 
 
 /*
-  API'DEKİ KODLAR DOĞRUDAN KULLANILIYOR.
+  Altın ürünleri artık sabit değil.
 
-  GA   = Gram
-  PC   = Çeyrek
-  PY   = Yarım
-  PT   = Tam/Teklik
-  PA   = Ata
-  CH_T = Külçe
-  USD  = Dolar
-  EUR  = Euro
-  GBP  = Sterlin
+  Altınkaynak API'sinden gelen bütün gold
+  kayıtları otomatik kullanılacak.
 */
 
-const products = [
+let goldProducts = [];
 
-  {
-    label:"Gram Altın",
-    code:"GA"
-  },
 
-  {
-    label:"Çeyrek Altın",
-    code:"PC"
-  },
+/*
+  Kod -> fiyat
 
-  {
-    label:"Yarım Altın",
-    code:"PY"
-  },
+  Örnek:
 
-  {
-    label:"Tam Altın",
-    code:"PT"
-  },
-
-  {
-    label:"Ata Cumhuriyet",
-    code:"PA"
-  },
-
-  {
-    label:"Külçe Altın",
-    code:"CH_T"
-  },
-
-  {
-    label:"USD",
-    code:"USD"
-  },
-
-  {
-    label:"EUR",
-    code:"EUR"
-  },
-
-  {
-    label:"GBP",
-    code:"GBP"
-  }
-
-];
-
+  GA -> Gram Altın
+  PC -> Çeyrek
+  CH_T -> Külçe
+  vs.
+*/
 
 let pricesByCode = {};
 
-let assets = [];
 
+let assets = [];
 
 try{
 
@@ -463,18 +430,6 @@ const type =
   document.getElementById("type");
 
 
-products.forEach(product=>{
-
-  type.add(
-    new Option(
-      product.label,
-      product.label
-    )
-  );
-
-});
-
-
 function fmt(value){
 
   return new Intl.NumberFormat(
@@ -491,28 +446,83 @@ function fmt(value){
 }
 
 
-function getProduct(label){
+/*
+  Varlık ekleme listesini
+  Altınkaynak'tan gelen bütün
+  altın ürünlerinden oluştur.
+*/
 
-  const product =
-    products.find(
-      p => p.label === label
+function buildAssetOptions(){
+
+  type.innerHTML="";
+
+  goldProducts.forEach(item=>{
+
+    type.add(
+      new Option(
+        item.name,
+        item.code
+      )
     );
 
-  if(!product){
-    return null;
+  });
+
+}
+
+
+/*
+  Kod üzerinden fiyat bul.
+*/
+
+function getPrice(code){
+
+  return pricesByCode[code] || null;
+
+}
+
+
+/*
+  Eski localStorage kayıtlarında
+  isim kullanılmış olabilir.
+
+  Yeni sistemde kod kullanıyoruz.
+*/
+
+function findAssetCode(asset){
+
+  if(
+    asset &&
+    asset.code &&
+    pricesByCode[asset.code]
+  ){
+
+    return asset.code;
+
   }
 
+
   /*
-    BURADA İSİM EŞLEŞTİRMESİ YOK.
-
-    Örneğin Gram Altın:
-    products -> GA
-    API -> GA
-
-    Direkt aynı kod.
+    Eski kayıtlar için isimden
+    bir kere eşleştir.
   */
 
-  return pricesByCode[product.code] || null;
+  if(asset && asset.type){
+
+    const found =
+      goldProducts.find(
+        item =>
+          item.name === asset.type
+      );
+
+    if(found){
+
+      return found.code;
+
+    }
+
+  }
+
+  return null;
 
 }
 
@@ -526,13 +536,26 @@ function render(){
 
   assets.forEach((asset,index)=>{
 
+    const code =
+      findAssetCode(asset);
+
     const price =
-      getProduct(asset.type);
+      code
+        ? getPrice(code)
+        : null;
 
     const quantity =
       Number(asset.qty) || 0;
 
     let value=0;
+
+
+    /*
+      PORTFÖY DEĞERİ:
+
+      Kullanıcının kuyumcuya satacağı fiyat
+      = Altınkaynak ALIŞ fiyatı.
+    */
 
     if(price){
 
@@ -541,7 +564,11 @@ function render(){
 
     }
 
-    total += value;
+
+    const displayName =
+      price?.name ||
+      asset.type ||
+      "Varlık";
 
 
     html += `
@@ -551,7 +578,7 @@ function render(){
         <div>
 
           <div class="name">
-            ${asset.type}
+            ${displayName}
           </div>
 
           <div class="sub">
@@ -559,7 +586,6 @@ function render(){
           </div>
 
         </div>
-
 
         <div class="right">
 
@@ -577,7 +603,7 @@ function render(){
 
             ${
               price
-                ? "Silmek için dokun"
+                ? "Alış fiyatı • Silmek için dokun"
                 : "Fiyat bekleniyor"
             }
 
@@ -588,6 +614,8 @@ function render(){
       </div>
 
     `;
+
+    total += value;
 
   });
 
@@ -630,8 +658,7 @@ function render(){
 
         if(
           confirm(
-            assets[index].type +
-            " varlığını silmek istiyor musun?"
+            "Bu varlığı silmek istiyor musun?"
           )
         ){
 
@@ -655,20 +682,18 @@ function renderPrices(){
   let html="";
 
 
-  products.forEach(product=>{
+  /*
+    Sadece altınlar.
+  */
 
-    /*
-      API'den gelen KODU doğrudan kullanıyoruz.
-    */
+  goldProducts.forEach(item=>{
 
     const price =
-      pricesByCode[product.code];
+      pricesByCode[item.code];
 
 
     if(!price){
-
       return;
-
     }
 
 
@@ -679,7 +704,7 @@ function renderPrices(){
         <div>
 
           <div class="name">
-            ${product.label}
+            ${item.name}
           </div>
 
           <div class="sub">
@@ -688,19 +713,62 @@ function renderPrices(){
 
         </div>
 
+        <div class="right">
+
+          <div class="buy">
+            ${fmt(price.buy)}
+          </div>
+
+          <div class="sell">
+            ${fmt(price.sell)}
+          </div>
+
+        </div>
+
+      </div>
+
+    `;
+
+  });
+
+
+  /*
+    Dövizler de gösterilsin.
+  */
+
+  const currencies =
+    Object.values(pricesByCode)
+      .filter(item =>
+        ["USD","EUR","GBP"].includes(item.code)
+      );
+
+
+  currencies.forEach(item=>{
+
+    html += `
+
+      <div class="row">
+
+        <div>
+
+          <div class="name">
+            ${item.name || item.code}
+          </div>
+
+          <div class="sub">
+            Alış / Satış
+          </div>
+
+        </div>
 
         <div class="right">
 
           <div class="buy">
-
-            ${fmt(price.buy)}
-
+            ${fmt(item.buy)}
           </div>
 
           <div class="sell">
-
-            ${fmt(price.sell)}
-
+            ${fmt(item.sell)}
           </div>
 
         </div>
@@ -766,13 +834,17 @@ async function load(){
 
 
     /*
-      API'DEN GELEN VERİ:
+      Altınları API'den olduğu gibi al.
+    */
 
-      data.gold
-      data.currency
+    goldProducts =
+      Array.isArray(data.gold)
+        ? data.gold
+        : [];
 
-      Bunların içindeki code değerlerini
-      doğrudan pricesByCode'a koyuyoruz.
+
+    /*
+      Fiyatları kodlarına göre kaydet.
     */
 
     pricesByCode={};
@@ -794,21 +866,19 @@ async function load(){
     allPrices.forEach(item=>{
 
       if(!item.code){
-
         return;
-
       }
 
 
       pricesByCode[item.code]={
 
-        buy:Number(item.buy),
-
-        sell:Number(item.sell),
-
         code:item.code,
 
         name:item.name,
+
+        buy:Number(item.buy),
+
+        sell:Number(item.sell),
 
         updatedAt:item.updatedAt
 
@@ -817,10 +887,12 @@ async function load(){
     });
 
 
-    console.log(
-      "Altınkaynak verisi:",
-      pricesByCode
-    );
+    /*
+      Varlık ekleme menüsünü
+      API'den gelen altınlarla oluştur.
+    */
+
+    buildAssetOptions();
 
 
     render();
@@ -952,11 +1024,11 @@ function addAsset(){
     );
 
 
-  const selected =
+  const selectedCode =
     type.value;
 
 
-  if(!selected){
+  if(!selectedCode){
 
     showToast(
       "Önce varlık seç"
@@ -981,9 +1053,21 @@ function addAsset(){
   }
 
 
+  const selectedProduct =
+    goldProducts.find(
+      item =>
+        item.code === selectedCode
+    );
+
+
   assets.push({
 
-    type:selected,
+    code:selectedCode,
+
+    type:
+      selectedProduct
+        ? selectedProduct.name
+        : selectedCode,
 
     qty:quantity
 
@@ -1004,8 +1088,7 @@ function addAsset(){
 
 
   showToast(
-    selected +
-    " portföye eklendi"
+    "Varlık portföye eklendi"
   );
 
 }
@@ -1033,7 +1116,7 @@ function showToast(text){
 
 
 /*
-  İlk yükleme
+  Başlangıç
 */
 
 render();
@@ -1042,9 +1125,8 @@ load();
 
 
 /*
-  Uygulama açıkken
-  30 saniyede bir Altınkaynak'tan
-  tekrar güncel veri alınır.
+  Her 30 saniyede
+  Altınkaynak'tan tekrar çek.
 */
 
 setInterval(
