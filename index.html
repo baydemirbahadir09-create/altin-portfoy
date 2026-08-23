@@ -109,7 +109,8 @@ body{
   display:flex;
   justify-content:space-between;
   align-items:center;
-  margin-bottom:8px
+  margin-bottom:8px;
+  gap:8px
 }
 
 .head b{
@@ -131,12 +132,20 @@ button{
   color:#fff
 }
 
+.toggle{
+  background:#242a33;
+  color:#fff;
+  font-size:11px;
+  padding:8px 10px
+}
+
 .row{
   display:flex;
   justify-content:space-between;
   align-items:center;
   padding:14px 0;
-  border-bottom:1px solid var(--line)
+  border-bottom:1px solid var(--line);
+  gap:10px
 }
 
 .row:last-child{
@@ -334,12 +343,24 @@ footer{
       Canlı Kurlar
     </b>
 
-    <button
-      type="button"
-      class="secondary"
-      onclick="load()">
-      ↻
-    </button>
+    <div style="display:flex;gap:6px">
+
+      <button
+        type="button"
+        class="toggle"
+        id="priceModeButton"
+        onclick="toggleAllPrices()">
+        Tümünü göster
+      </button>
+
+      <button
+        type="button"
+        class="secondary"
+        onclick="load()">
+        ↻
+      </button>
+
+    </div>
 
   </div>
 
@@ -370,6 +391,19 @@ footer{
     <h2 style="margin-top:0">
       Varlık ekle
     </h2>
+
+    <label class="label">
+      Görünüm
+    </label>
+
+    <button
+      type="button"
+      class="toggle"
+      id="assetModeButton"
+      onclick="toggleAllAssets()"
+      style="width:100%;margin:6px 0 15px">
+      Tüm varlıkları göster
+    </button>
 
     <label class="label">
       Varlık
@@ -424,7 +458,25 @@ const API = {
 
 
 /* =========================
-   VERİLER
+   TEMEL VARLIKLAR
+========================= */
+
+const DEFAULT_GOLD_CODES = [
+  "GA",
+  "B_T",
+  "PC",
+  "PY"
+];
+
+const DEFAULT_CURRENCY_CODES = [
+  "USD",
+  "EUR",
+  "GBP"
+];
+
+
+/* =========================
+   DURUM
 ========================= */
 
 let goldProducts = [];
@@ -434,6 +486,10 @@ let currencyProducts = [];
 let pricesByCode = {};
 
 let assets = [];
+
+let showAllPrices = false;
+
+let showAllAssets = false;
 
 
 /* =========================
@@ -487,7 +543,22 @@ function fmt(value){
 
 
 /* =========================
-   VARLIK LİSTESİ
+   TEMEL ÜRÜN KONTROLÜ
+========================= */
+
+function isDefaultCode(code){
+
+  return (
+    code === "TRY" ||
+    DEFAULT_GOLD_CODES.includes(code) ||
+    DEFAULT_CURRENCY_CODES.includes(code)
+  );
+
+}
+
+
+/* =========================
+   EKLE MENÜSÜ
 ========================= */
 
 function buildAssetOptions(){
@@ -509,11 +580,20 @@ function buildAssetOptions(){
 
   /*
     ALTINLAR
-
-    API'den gelen bütün altınlar.
   */
 
-  goldProducts.forEach(
+  const goldList =
+    showAllAssets
+      ? goldProducts
+      : goldProducts.filter(
+          item =>
+            DEFAULT_GOLD_CODES.includes(
+              item.code
+            )
+        );
+
+
+  goldList.forEach(
     item => {
 
       if(!item.code){
@@ -533,36 +613,59 @@ function buildAssetOptions(){
 
   /*
     DÖVİZLER
+
+    Sadece USD/EUR/GBP.
   */
 
-  [
-    "USD",
-    "EUR",
-    "GBP"
-  ].forEach(
-    code => {
-
-      const item =
-        currencyProducts.find(
-          currency =>
-            currency.code === code
-        );
+  const currencyList =
+    currencyProducts.filter(
+      item =>
+        DEFAULT_CURRENCY_CODES.includes(
+          item.code
+        )
+    );
 
 
-      if(!item){
-        return;
-      }
-
+  currencyList.forEach(
+    item => {
 
       type.add(
         new Option(
-          item.name || code,
-          code
+          item.name || item.code,
+          item.code
         )
       );
 
     }
   );
+
+
+  /*
+    Buton yazısı
+  */
+
+  document
+    .getElementById(
+      "assetModeButton"
+    )
+    .textContent =
+      showAllAssets
+        ? "Sadece temel varlıklar"
+        : "Tüm varlıkları göster";
+
+}
+
+
+/* =========================
+   TÜM EKLEME SEÇENEKLERİ
+========================= */
+
+function toggleAllAssets(){
+
+  showAllAssets =
+    !showAllAssets;
+
+  buildAssetOptions();
 
 }
 
@@ -593,19 +696,7 @@ function findAssetCode(asset){
 
 
   /*
-    --------------------------------
-    GRAM ALTIN KORUMASI
-    --------------------------------
-
-    Gram Altın kesinlikle GA.
-
-    Eski localStorage kaydında:
-
-    code: HH_T
-    type: Gram Altın
-
-    gibi yanlış bir kayıt varsa
-    otomatik olarak GA'ya çevrilir.
+    Gram Altın her zaman GA.
   */
 
   if(
@@ -632,7 +723,7 @@ function findAssetCode(asset){
 
 
   /*
-    Yeni sistem kayıtları
+    Mevcut kayıt
   */
 
   if(
@@ -646,7 +737,7 @@ function findAssetCode(asset){
 
 
   /*
-    Eski kayıtları isim üzerinden bul.
+    Eski kayıtları isimden bul
   */
 
   if(asset.type){
@@ -669,11 +760,6 @@ function findAssetCode(asset){
 
     if(found){
 
-      /*
-        Gram Altın ise
-        her durumda GA.
-      */
-
       if(
         asset.type === "Gram Altın"
       ){
@@ -681,7 +767,6 @@ function findAssetCode(asset){
         return "GA";
 
       }
-
 
       return found.code;
 
@@ -696,7 +781,7 @@ function findAssetCode(asset){
 
 
 /* =========================
-   PORTFÖY RENDER
+   PORTFÖY
 ========================= */
 
 function render(){
@@ -725,9 +810,7 @@ function render(){
 
 
       /*
-        --------------------------------
         TL
-        --------------------------------
       */
 
       if(
@@ -744,9 +827,7 @@ function render(){
 
 
       /*
-        --------------------------------
-        ALTIN / DÖVİZ
-        --------------------------------
+        Diğer varlıklar
       */
 
       else{
@@ -759,17 +840,8 @@ function render(){
 
         if(price){
 
-          /*
-            Portföy değeri:
-
-            Kullanıcının elindeki varlığı
-            bozdururken alacağı ALIŞ fiyatı.
-          */
-
           value =
-            Number(
-              price.buy || 0
-            ) *
+            Number(price.buy || 0) *
             quantity;
 
 
@@ -921,10 +993,25 @@ function renderPrices(){
 
 
   /*
+    Görüntülenecek altınlar
+  */
+
+  const goldList =
+    showAllPrices
+      ? goldProducts
+      : goldProducts.filter(
+          item =>
+            DEFAULT_GOLD_CODES.includes(
+              item.code
+            )
+        );
+
+
+  /*
     ALTINLAR
   */
 
-  goldProducts.forEach(
+  goldList.forEach(
     item => {
 
       const price =
@@ -982,11 +1069,7 @@ function renderPrices(){
   currencyProducts
     .filter(
       item =>
-        [
-          "USD",
-          "EUR",
-          "GBP"
-        ].includes(
+        DEFAULT_CURRENCY_CODES.includes(
           item.code
         )
     )
@@ -1055,11 +1138,39 @@ function renderPrices(){
         </div>
       `;
 
+
+  /*
+    Buton yazısı
+  */
+
+  document
+    .getElementById(
+      "priceModeButton"
+    )
+    .textContent =
+      showAllPrices
+        ? "Sadece temel varlıklar"
+        : "Tümünü göster";
+
 }
 
 
 /* =========================
-   API'DEN VERİ AL
+   TÜM KURLARI GÖSTER / GİZLE
+========================= */
+
+function toggleAllPrices(){
+
+  showAllPrices =
+    !showAllPrices;
+
+  renderPrices();
+
+}
+
+
+/* =========================
+   API
 ========================= */
 
 async function load(){
@@ -1105,7 +1216,7 @@ async function load(){
 
 
     /*
-      ALTINLAR
+      ALTIN
     */
 
     goldProducts =
@@ -1117,7 +1228,7 @@ async function load(){
 
 
     /*
-      DÖVİZLER
+      DÖVİZ
     */
 
     currencyProducts =
@@ -1199,14 +1310,14 @@ async function load(){
 
 
     /*
-      EKLE MENÜSÜ
+      Menüleri yenile
     */
 
     buildAssetOptions();
 
 
     /*
-      EKRAN
+      Ekranı yenile
     */
 
     render();
@@ -1215,7 +1326,7 @@ async function load(){
 
 
     /*
-      YENİLEME SAATİ
+      Saat
     */
 
     const now =
@@ -1440,7 +1551,7 @@ function addAsset(){
 
 
   /*
-    ALTIN
+    ALTIN / DÖVİZ
   */
 
   else{
@@ -1452,10 +1563,6 @@ function addAsset(){
           selectedCode
       );
 
-
-    /*
-      DÖVİZ
-    */
 
     const selectedCurrency =
       currencyProducts.find(
@@ -1553,8 +1660,7 @@ load();
 
 
 /*
-  Her 30 saniyede
-  fiyatları yenile.
+  30 saniyede bir yenile
 */
 
 setInterval(
