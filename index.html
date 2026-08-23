@@ -273,7 +273,6 @@ footer{
 
 </section>
 
-
 <section class="card">
 
   <div class="head">
@@ -290,7 +289,6 @@ footer{
   <div id="assets"></div>
 
 </section>
-
 
 <section class="card">
 
@@ -317,13 +315,11 @@ footer{
 
 </section>
 
-
 <footer>
   Fiyat kaynağı: Altınkaynak • Bilgi amaçlıdır
 </footer>
 
 </main>
-
 
 <div class="modal" id="modal">
 
@@ -371,9 +367,7 @@ footer{
 
 </div>
 
-
 <div id="toast" class="toast"></div>
-
 
 <script>
 
@@ -382,31 +376,22 @@ const API = {
 };
 
 
-/*
-  Altın ürünleri artık sabit değil.
-
-  Altınkaynak API'sinden gelen bütün gold
-  kayıtları otomatik kullanılacak.
-*/
+/* =========================
+   VERİLER
+========================= */
 
 let goldProducts = [];
 
-
-/*
-  Kod -> fiyat
-
-  Örnek:
-
-  GA -> Gram Altın
-  PC -> Çeyrek
-  CH_T -> Külçe
-  vs.
-*/
+let currencyProducts = [];
 
 let pricesByCode = {};
 
-
 let assets = [];
+
+
+/* =========================
+   LOCAL STORAGE
+========================= */
 
 try{
 
@@ -430,6 +415,10 @@ const type =
   document.getElementById("type");
 
 
+/* =========================
+   FORMAT
+========================= */
+
 function fmt(value){
 
   return new Intl.NumberFormat(
@@ -446,17 +435,38 @@ function fmt(value){
 }
 
 
-/*
-  Varlık ekleme listesini
-  Altınkaynak'tan gelen bütün
-  altın ürünlerinden oluştur.
-*/
+/* =========================
+   VARLIK EKLEME LİSTESİ
+========================= */
 
 function buildAssetOptions(){
 
   type.innerHTML="";
 
+
+  /*
+    1. TL
+    TL'nin canlı fiyatı yok.
+    1 TL = 1 TL olarak hesaplanıyor.
+  */
+
+  type.add(
+    new Option(
+      "Türk Lirası (TL)",
+      "TRY"
+    )
+  );
+
+
+  /*
+    2. Altınlar
+  */
+
   goldProducts.forEach(item=>{
+
+    if(!item.code){
+      return;
+    }
 
     type.add(
       new Option(
@@ -467,12 +477,48 @@ function buildAssetOptions(){
 
   });
 
+
+  /*
+    3. Dövizler
+    USD / EUR / GBP
+  */
+
+  const currencyCodes = [
+    "USD",
+    "EUR",
+    "GBP"
+  ];
+
+
+  currencyCodes.forEach(code=>{
+
+    const item =
+      currencyProducts.find(
+        currency =>
+          currency.code === code
+      );
+
+
+    if(!item){
+      return;
+    }
+
+
+    type.add(
+      new Option(
+        item.name || code,
+        code
+      )
+    );
+
+  });
+
 }
 
 
-/*
-  Kod üzerinden fiyat bul.
-*/
+/* =========================
+   FİYAT BUL
+========================= */
 
 function getPrice(code){
 
@@ -481,51 +527,79 @@ function getPrice(code){
 }
 
 
-/*
-  Eski localStorage kayıtlarında
-  isim kullanılmış olabilir.
-
-  Yeni sistemde kod kullanıyoruz.
-*/
+/* =========================
+   ESKİ KAYITLAR
+========================= */
 
 function findAssetCode(asset){
 
+  /*
+    Yeni sistem
+  */
+
   if(
     asset &&
-    asset.code &&
-    pricesByCode[asset.code]
+    asset.code
   ){
 
-    return asset.code;
+    /*
+      TL özel varlık
+    */
+
+    if(asset.code === "TRY"){
+      return "TRY";
+    }
+
+
+    /*
+      Canlı fiyatı bulunan varlık
+    */
+
+    if(pricesByCode[asset.code]){
+      return asset.code;
+    }
 
   }
 
 
   /*
     Eski kayıtlar için isimden
-    bir kere eşleştir.
+    eşleştirme
   */
 
   if(asset && asset.type){
 
+    const allProducts = [
+
+      ...goldProducts,
+
+      ...currencyProducts
+
+    ];
+
+
     const found =
-      goldProducts.find(
+      allProducts.find(
         item =>
           item.name === asset.type
       );
 
+
     if(found){
-
       return found.code;
-
     }
 
   }
+
 
   return null;
 
 }
 
+
+/* =========================
+   PORTFÖY
+========================= */
 
 function render(){
 
@@ -539,36 +613,68 @@ function render(){
     const code =
       findAssetCode(asset);
 
-    const price =
-      code
-        ? getPrice(code)
-        : null;
 
     const quantity =
       Number(asset.qty) || 0;
 
+
     let value=0;
+
+    let displayName =
+      asset.type ||
+      "Varlık";
 
 
     /*
-      PORTFÖY DEĞERİ:
-
-      Kullanıcının kuyumcuya satacağı fiyat
-      = Altınkaynak ALIŞ fiyatı.
+      TL
     */
 
-    if(price){
+    if(code === "TRY"){
 
       value =
-        price.buy * quantity;
+        quantity;
+
+      displayName =
+        "Türk Lirası (TL)";
 
     }
 
 
-    const displayName =
-      price?.name ||
-      asset.type ||
-      "Varlık";
+    /*
+      Altın / döviz
+    */
+
+    else{
+
+      const price =
+        code
+          ? getPrice(code)
+          : null;
+
+
+      if(price){
+
+        /*
+          PORTFÖY DEĞERİ:
+
+          Kullanıcının elindeki varlığı
+          bozdururken alacağı değer.
+
+          Bu nedenle ALIŞ fiyatı kullanılır.
+        */
+
+        value =
+          Number(price.buy || 0) *
+          quantity;
+
+
+        displayName =
+          price.name ||
+          displayName;
+
+      }
+
+    }
 
 
     html += `
@@ -582,7 +688,11 @@ function render(){
           </div>
 
           <div class="sub">
-            ${quantity} adet
+            ${quantity} ${
+              code === "TRY"
+                ? "TL"
+                : "adet"
+            }
           </div>
 
         </div>
@@ -591,20 +701,16 @@ function render(){
 
           <div class="sell">
 
-            ${
-              price
-                ? fmt(value)
-                : "—"
-            }
+            ${fmt(value)}
 
           </div>
 
           <div class="sub">
 
             ${
-              price
-                ? "Alış fiyatı • Silmek için dokun"
-                : "Fiyat bekleniyor"
+              code === "TRY"
+                ? "Nakit TL • Silmek için dokun"
+                : "Alış fiyatı • Silmek için dokun"
             }
 
           </div>
@@ -614,6 +720,7 @@ function render(){
       </div>
 
     `;
+
 
     total += value;
 
@@ -677,13 +784,17 @@ function render(){
 }
 
 
+/* =========================
+   CANLI FİYATLAR
+========================= */
+
 function renderPrices(){
 
   let html="";
 
 
   /*
-    Sadece altınlar.
+    ALTINLAR
   */
 
   goldProducts.forEach(item=>{
@@ -733,17 +844,31 @@ function renderPrices(){
 
 
   /*
-    Dövizler de gösterilsin.
+    DÖVİZLER
+
+    API'den gelen currency kayıtları
+    doğrudan kullanılıyor.
   */
 
   const currencies =
-    Object.values(pricesByCode)
-      .filter(item =>
-        ["USD","EUR","GBP"].includes(item.code)
-      );
+    currencyProducts.filter(
+      item =>
+        ["USD","EUR","GBP"].includes(
+          item.code
+        )
+    );
 
 
   currencies.forEach(item=>{
+
+    const price =
+      pricesByCode[item.code];
+
+
+    if(!price){
+      return;
+    }
+
 
     html += `
 
@@ -752,7 +877,7 @@ function renderPrices(){
         <div>
 
           <div class="name">
-            ${item.name || item.code}
+            ${price.name || item.code}
           </div>
 
           <div class="sub">
@@ -764,11 +889,11 @@ function renderPrices(){
         <div class="right">
 
           <div class="buy">
-            ${fmt(item.buy)}
+            ${fmt(price.buy)}
           </div>
 
           <div class="sell">
-            ${fmt(item.sell)}
+            ${fmt(price.sell)}
           </div>
 
         </div>
@@ -793,6 +918,10 @@ function renderPrices(){
 
 }
 
+
+/* =========================
+   API'DEN FİYATLARI ÇEK
+========================= */
 
 async function load(){
 
@@ -834,7 +963,7 @@ async function load(){
 
 
     /*
-      Altınları API'den olduğu gibi al.
+      ALTINLAR
     */
 
     goldProducts =
@@ -844,7 +973,17 @@ async function load(){
 
 
     /*
-      Fiyatları kodlarına göre kaydet.
+      DÖVİZLER
+    */
+
+    currencyProducts =
+      Array.isArray(data.currency)
+        ? data.currency
+        : [];
+
+
+    /*
+      TÜM FİYATLAR
     */
 
     pricesByCode={};
@@ -852,13 +991,9 @@ async function load(){
 
     const allPrices = [
 
-      ...(Array.isArray(data.gold)
-        ? data.gold
-        : []),
+      ...goldProducts,
 
-      ...(Array.isArray(data.currency)
-        ? data.currency
-        : [])
+      ...currencyProducts
 
     ];
 
@@ -876,6 +1011,15 @@ async function load(){
 
         name:item.name,
 
+        /*
+          ÖNEMLİ:
+          API'nin gönderdiği BUY değeri
+          doğrudan kullanılıyor.
+
+          Burada sell ile buy
+          birbirine karıştırılmıyor.
+        */
+
         buy:Number(item.buy),
 
         sell:Number(item.sell),
@@ -888,17 +1032,45 @@ async function load(){
 
 
     /*
-      Varlık ekleme menüsünü
-      API'den gelen altınlarla oluştur.
+      TL'nin piyasa kuru yok.
+      Ancak portföyde kullanılabilmesi
+      için sanal fiyat oluşturuyoruz.
+    */
+
+    pricesByCode["TRY"]={
+
+      code:"TRY",
+
+      name:"Türk Lirası (TL)",
+
+      buy:1,
+
+      sell:1,
+
+      updatedAt:data.updatedAt
+
+    };
+
+
+    /*
+      EKLE MENÜSÜ
     */
 
     buildAssetOptions();
 
 
+    /*
+      EKRANI GÜNCELLE
+    */
+
     render();
 
     renderPrices();
 
+
+    /*
+      SON YENİLEME
+    */
 
     const now =
       new Date();
@@ -952,6 +1124,13 @@ async function load(){
         "Canlı veri bağlantısı kurulamadı.";
 
 
+    /*
+      API çalışmasa bile
+      mevcut portföyü göster.
+    */
+
+    buildAssetOptions();
+
     render();
 
     renderPrices();
@@ -960,6 +1139,10 @@ async function load(){
 
 }
 
+
+/* =========================
+   KAYDET
+========================= */
 
 function save(show=true){
 
@@ -979,6 +1162,10 @@ function save(show=true){
 
 }
 
+
+/* =========================
+   MODAL
+========================= */
 
 function openModal(){
 
@@ -1013,6 +1200,10 @@ function closeModal(){
 
 }
 
+
+/* =========================
+   VARLIK EKLE
+========================= */
 
 function addAsset(){
 
@@ -1053,25 +1244,68 @@ function addAsset(){
   }
 
 
-  const selectedProduct =
-    goldProducts.find(
-      item =>
-        item.code === selectedCode
-    );
+  /*
+    TL
+  */
+
+  if(selectedCode === "TRY"){
+
+    assets.push({
+
+      code:"TRY",
+
+      type:"Türk Lirası (TL)",
+
+      qty:quantity
+
+    });
+
+  }
 
 
-  assets.push({
+  /*
+    ALTIN
+  */
 
-    code:selectedCode,
+  else{
 
-    type:
-      selectedProduct
-        ? selectedProduct.name
-        : selectedCode,
+    const selectedProduct =
+      goldProducts.find(
+        item =>
+          item.code === selectedCode
+      );
 
-    qty:quantity
 
-  });
+    /*
+      DÖVİZ
+    */
+
+    const selectedCurrency =
+      currencyProducts.find(
+        item =>
+          item.code === selectedCode
+      );
+
+
+    const selected =
+      selectedProduct ||
+      selectedCurrency;
+
+
+    assets.push({
+
+      code:selectedCode,
+
+      type:
+        selected
+          ? selected.name
+          : selectedCode,
+
+      qty:quantity
+
+    });
+
+  }
 
 
   save(false);
@@ -1094,6 +1328,10 @@ function addAsset(){
 }
 
 
+/* =========================
+   TOAST
+========================= */
+
 function showToast(text){
 
   const toast =
@@ -1115,9 +1353,9 @@ function showToast(text){
 }
 
 
-/*
-  Başlangıç
-*/
+/* =========================
+   BAŞLANGIÇ
+========================= */
 
 render();
 
