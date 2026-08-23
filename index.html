@@ -16,7 +16,9 @@
   --green:#40d99b;
 }
 
-*{box-sizing:border-box}
+*{
+  box-sizing:border-box
+}
 
 body{
   margin:0;
@@ -191,7 +193,8 @@ button{
   border-top:1px solid #2b3039
 }
 
-select,input{
+select,
+input{
   width:100%;
   padding:14px;
   border-radius:13px;
@@ -239,9 +242,19 @@ footer{
 <main class="app">
 
 <div class="top">
-  <div class="brand">₺ Altın Portföy</div>
-  <div class="live" id="live">● CANLI</div>
+
+  <div class="brand">
+    ₺ Altın Portföy
+  </div>
+
+  <div
+    class="live"
+    id="live">
+    ● CANLI
+  </div>
+
 </div>
+
 
 <section class="hero">
 
@@ -249,34 +262,56 @@ footer{
     PORTFÖYÜN GÜNCEL SATIŞ DEĞERİ
   </div>
 
-  <div id="total" class="total">
+  <div
+    id="total"
+    class="total">
     ₺0,00
   </div>
 
-  <div id="updated" class="status">
+  <div
+    id="updated"
+    class="status">
     Veriler yükleniyor…
   </div>
 
   <div class="grid">
 
     <div class="mini">
-      <span class="label">Varlık sayısı</span>
-      <b id="count">0</b>
+
+      <span class="label">
+        Varlık sayısı
+      </span>
+
+      <b id="count">
+        0
+      </b>
+
     </div>
 
     <div class="mini">
-      <span class="label">Son yenileme</span>
-      <b id="time">—</b>
+
+      <span class="label">
+        Son yenileme
+      </span>
+
+      <b id="time">
+        —
+      </b>
+
     </div>
 
   </div>
 
 </section>
 
+
 <section class="card">
 
   <div class="head">
-    <b>Varlıklarım</b>
+
+    <b>
+      Varlıklarım
+    </b>
 
     <button
       type="button"
@@ -290,11 +325,14 @@ footer{
 
 </section>
 
+
 <section class="card">
 
   <div class="head">
 
-    <b>Canlı Kurlar</b>
+    <b>
+      Canlı Kurlar
+    </b>
 
     <button
       type="button"
@@ -315,13 +353,17 @@ footer{
 
 </section>
 
+
 <footer>
   Fiyat kaynağı: Altınkaynak • Bilgi amaçlıdır
 </footer>
 
 </main>
 
-<div class="modal" id="modal">
+
+<div
+  class="modal"
+  id="modal">
 
   <div class="sheet">
 
@@ -367,7 +409,12 @@ footer{
 
 </div>
 
-<div id="toast" class="toast"></div>
+
+<div
+  id="toast"
+  class="toast">
+</div>
+
 
 <script>
 
@@ -397,7 +444,9 @@ try{
 
   assets =
     JSON.parse(
-      localStorage.getItem("altinAssets") || "[]"
+      localStorage.getItem(
+        "altinAssets"
+      ) || "[]"
     );
 
   if(!Array.isArray(assets)){
@@ -412,11 +461,13 @@ try{
 
 
 const type =
-  document.getElementById("type");
+  document.getElementById(
+    "type"
+  );
 
 
 /* =========================
-   FORMAT
+   PARA FORMAT
 ========================= */
 
 function fmt(value){
@@ -436,7 +487,7 @@ function fmt(value){
 
 
 /* =========================
-   VARLIK EKLEME LİSTESİ
+   VARLIK LİSTESİ
 ========================= */
 
 function buildAssetOptions(){
@@ -445,9 +496,7 @@ function buildAssetOptions(){
 
 
   /*
-    1. TL
-    TL'nin canlı fiyatı yok.
-    1 TL = 1 TL olarak hesaplanıyor.
+    TL
   */
 
   type.add(
@@ -459,59 +508,61 @@ function buildAssetOptions(){
 
 
   /*
-    2. Altınlar
+    ALTINLAR
+
+    API'den gelen bütün altınlar.
   */
 
-  goldProducts.forEach(item=>{
+  goldProducts.forEach(
+    item => {
 
-    if(!item.code){
-      return;
+      if(!item.code){
+        return;
+      }
+
+      type.add(
+        new Option(
+          item.name,
+          item.code
+        )
+      );
+
     }
-
-    type.add(
-      new Option(
-        item.name,
-        item.code
-      )
-    );
-
-  });
+  );
 
 
   /*
-    3. Dövizler
-    USD / EUR / GBP
+    DÖVİZLER
   */
 
-  const currencyCodes = [
+  [
     "USD",
     "EUR",
     "GBP"
-  ];
+  ].forEach(
+    code => {
+
+      const item =
+        currencyProducts.find(
+          currency =>
+            currency.code === code
+        );
 
 
-  currencyCodes.forEach(code=>{
+      if(!item){
+        return;
+      }
 
-    const item =
-      currencyProducts.find(
-        currency =>
-          currency.code === code
+
+      type.add(
+        new Option(
+          item.name || code,
+          code
+        )
       );
 
-
-    if(!item){
-      return;
     }
-
-
-    type.add(
-      new Option(
-        item.name || code,
-        code
-      )
-    );
-
-  });
+  );
 
 }
 
@@ -522,52 +573,83 @@ function buildAssetOptions(){
 
 function getPrice(code){
 
-  return pricesByCode[code] || null;
+  return (
+    pricesByCode[code] ||
+    null
+  );
 
 }
 
 
 /* =========================
-   ESKİ KAYITLAR
+   ASSET KODU BUL
 ========================= */
 
 function findAssetCode(asset){
 
+  if(!asset){
+    return null;
+  }
+
+
   /*
-    Yeni sistem
+    --------------------------------
+    GRAM ALTIN KORUMASI
+    --------------------------------
+
+    Gram Altın kesinlikle GA.
+
+    Eski localStorage kaydında:
+
+    code: HH_T
+    type: Gram Altın
+
+    gibi yanlış bir kayıt varsa
+    otomatik olarak GA'ya çevrilir.
   */
 
   if(
-    asset &&
-    asset.code
+    asset.type === "Gram Altın" ||
+    asset.name === "Gram Altın"
   ){
 
-    /*
-      TL özel varlık
-    */
-
-    if(asset.code === "TRY"){
-      return "TRY";
-    }
-
-
-    /*
-      Canlı fiyatı bulunan varlık
-    */
-
-    if(pricesByCode[asset.code]){
-      return asset.code;
-    }
+    return "GA";
 
   }
 
 
   /*
-    Eski kayıtlar için isimden
-    eşleştirme
+    TL
   */
 
-  if(asset && asset.type){
+  if(
+    asset.code === "TRY"
+  ){
+
+    return "TRY";
+
+  }
+
+
+  /*
+    Yeni sistem kayıtları
+  */
+
+  if(
+    asset.code &&
+    pricesByCode[asset.code]
+  ){
+
+    return asset.code;
+
+  }
+
+
+  /*
+    Eski kayıtları isim üzerinden bul.
+  */
+
+  if(asset.type){
 
     const allProducts = [
 
@@ -586,7 +668,23 @@ function findAssetCode(asset){
 
 
     if(found){
+
+      /*
+        Gram Altın ise
+        her durumda GA.
+      */
+
+      if(
+        asset.type === "Gram Altın"
+      ){
+
+        return "GA";
+
+      }
+
+
       return found.code;
+
     }
 
   }
@@ -598,138 +696,152 @@ function findAssetCode(asset){
 
 
 /* =========================
-   PORTFÖY
+   PORTFÖY RENDER
 ========================= */
 
 function render(){
 
-  let total=0;
+  let total = 0;
 
-  let html="";
-
-
-  assets.forEach((asset,index)=>{
-
-    const code =
-      findAssetCode(asset);
+  let html = "";
 
 
-    const quantity =
-      Number(asset.qty) || 0;
+  assets.forEach(
+    (asset,index) => {
+
+      const code =
+        findAssetCode(asset);
 
 
-    let value=0;
-
-    let displayName =
-      asset.type ||
-      "Varlık";
+      const quantity =
+        Number(asset.qty) || 0;
 
 
-    /*
-      TL
-    */
+      let value = 0;
 
-    if(code === "TRY"){
-
-      value =
-        quantity;
-
-      displayName =
-        "Türk Lirası (TL)";
-
-    }
+      let displayName =
+        asset.type ||
+        "Varlık";
 
 
-    /*
-      Altın / döviz
-    */
+      /*
+        --------------------------------
+        TL
+        --------------------------------
+      */
 
-    else{
-
-      const price =
-        code
-          ? getPrice(code)
-          : null;
-
-
-      if(price){
-
-        /*
-          PORTFÖY DEĞERİ:
-
-          Kullanıcının elindeki varlığı
-          bozdururken alacağı değer.
-
-          Bu nedenle ALIŞ fiyatı kullanılır.
-        */
+      if(
+        code === "TRY"
+      ){
 
         value =
-          Number(price.buy || 0) *
           quantity;
 
-
         displayName =
-          price.name ||
-          displayName;
+          "Türk Lirası (TL)";
 
       }
 
+
+      /*
+        --------------------------------
+        ALTIN / DÖVİZ
+        --------------------------------
+      */
+
+      else{
+
+        const price =
+          code
+            ? getPrice(code)
+            : null;
+
+
+        if(price){
+
+          /*
+            Portföy değeri:
+
+            Kullanıcının elindeki varlığı
+            bozdururken alacağı ALIŞ fiyatı.
+          */
+
+          value =
+            Number(
+              price.buy || 0
+            ) *
+            quantity;
+
+
+          displayName =
+            price.name ||
+            displayName;
+
+        }
+
+      }
+
+
+      html += `
+
+        <div class="row">
+
+          <div>
+
+            <div class="name">
+              ${displayName}
+            </div>
+
+            <div class="sub">
+
+              ${quantity}
+
+              ${
+                code === "TRY"
+                  ? "TL"
+                  : "adet"
+              }
+
+            </div>
+
+          </div>
+
+
+          <div class="right">
+
+            <div class="sell">
+              ${fmt(value)}
+            </div>
+
+            <div class="sub">
+
+              ${
+                code === "TRY"
+                  ? "Nakit TL • Silmek için dokun"
+                  : "Alış fiyatı • Silmek için dokun"
+              }
+
+            </div>
+
+          </div>
+
+        </div>
+
+      `;
+
+
+      total += value;
+
     }
-
-
-    html += `
-
-      <div class="row">
-
-        <div>
-
-          <div class="name">
-            ${displayName}
-          </div>
-
-          <div class="sub">
-            ${quantity} ${
-              code === "TRY"
-                ? "TL"
-                : "adet"
-            }
-          </div>
-
-        </div>
-
-        <div class="right">
-
-          <div class="sell">
-
-            ${fmt(value)}
-
-          </div>
-
-          <div class="sub">
-
-            ${
-              code === "TRY"
-                ? "Nakit TL • Silmek için dokun"
-                : "Alış fiyatı • Silmek için dokun"
-            }
-
-          </div>
-
-        </div>
-
-      </div>
-
-    `;
-
-
-    total += value;
-
-  });
+  );
 
 
   document
-    .getElementById("assets")
+    .getElementById(
+      "assets"
+    )
     .innerHTML =
+
       html ||
 
       `
@@ -746,168 +858,195 @@ function render(){
 
 
   document
-    .getElementById("total")
+    .getElementById(
+      "total"
+    )
     .textContent =
       fmt(total);
 
 
   document
-    .getElementById("count")
+    .getElementById(
+      "count"
+    )
     .textContent =
       assets.length;
 
 
+  /*
+    Silme
+  */
+
   document
-    .querySelectorAll("#assets .row")
-    .forEach((element,index)=>{
+    .querySelectorAll(
+      "#assets .row"
+    )
+    .forEach(
+      (element,index) => {
 
-      element.onclick=()=>{
+        element.onclick = () => {
 
-        if(
-          confirm(
-            "Bu varlığı silmek istiyor musun?"
-          )
-        ){
+          if(
+            confirm(
+              "Bu varlığı silmek istiyor musun?"
+            )
+          ){
 
-          assets.splice(index,1);
+            assets.splice(
+              index,
+              1
+            );
 
-          save(false);
+            save(false);
 
-          render();
+            render();
 
-        }
+          }
 
-      };
+        };
 
-    });
+      }
+    );
 
 }
 
 
 /* =========================
-   CANLI FİYATLAR
+   CANLI KURLAR
 ========================= */
 
 function renderPrices(){
 
-  let html="";
+  let html = "";
 
 
   /*
     ALTINLAR
   */
 
-  goldProducts.forEach(item=>{
+  goldProducts.forEach(
+    item => {
 
-    const price =
-      pricesByCode[item.code];
+      const price =
+        pricesByCode[
+          item.code
+        ];
 
 
-    if(!price){
-      return;
+      if(!price){
+        return;
+      }
+
+
+      html += `
+
+        <div class="row">
+
+          <div>
+
+            <div class="name">
+              ${item.name}
+            </div>
+
+            <div class="sub">
+              Alış / Satış
+            </div>
+
+          </div>
+
+
+          <div class="right">
+
+            <div class="buy">
+              ${fmt(price.buy)}
+            </div>
+
+            <div class="sell">
+              ${fmt(price.sell)}
+            </div>
+
+          </div>
+
+        </div>
+
+      `;
+
     }
-
-
-    html += `
-
-      <div class="row">
-
-        <div>
-
-          <div class="name">
-            ${item.name}
-          </div>
-
-          <div class="sub">
-            Alış / Satış
-          </div>
-
-        </div>
-
-        <div class="right">
-
-          <div class="buy">
-            ${fmt(price.buy)}
-          </div>
-
-          <div class="sell">
-            ${fmt(price.sell)}
-          </div>
-
-        </div>
-
-      </div>
-
-    `;
-
-  });
+  );
 
 
   /*
     DÖVİZLER
-
-    API'den gelen currency kayıtları
-    doğrudan kullanılıyor.
   */
 
-  const currencies =
-    currencyProducts.filter(
+  currencyProducts
+    .filter(
       item =>
-        ["USD","EUR","GBP"].includes(
+        [
+          "USD",
+          "EUR",
+          "GBP"
+        ].includes(
           item.code
         )
+    )
+    .forEach(
+      item => {
+
+        const price =
+          pricesByCode[
+            item.code
+          ];
+
+
+        if(!price){
+          return;
+        }
+
+
+        html += `
+
+          <div class="row">
+
+            <div>
+
+              <div class="name">
+                ${price.name || item.code}
+              </div>
+
+              <div class="sub">
+                Alış / Satış
+              </div>
+
+            </div>
+
+
+            <div class="right">
+
+              <div class="buy">
+                ${fmt(price.buy)}
+              </div>
+
+              <div class="sell">
+                ${fmt(price.sell)}
+              </div>
+
+            </div>
+
+          </div>
+
+        `;
+
+      }
     );
 
 
-  currencies.forEach(item=>{
-
-    const price =
-      pricesByCode[item.code];
-
-
-    if(!price){
-      return;
-    }
-
-
-    html += `
-
-      <div class="row">
-
-        <div>
-
-          <div class="name">
-            ${price.name || item.code}
-          </div>
-
-          <div class="sub">
-            Alış / Satış
-          </div>
-
-        </div>
-
-        <div class="right">
-
-          <div class="buy">
-            ${fmt(price.buy)}
-          </div>
-
-          <div class="sell">
-            ${fmt(price.sell)}
-          </div>
-
-        </div>
-
-      </div>
-
-    `;
-
-  });
-
-
   document
-    .getElementById("prices")
+    .getElementById(
+      "prices"
+    )
     .innerHTML =
+
       html ||
 
       `
@@ -920,13 +1059,15 @@ function renderPrices(){
 
 
 /* =========================
-   API'DEN FİYATLARI ÇEK
+   API'DEN VERİ AL
 ========================= */
 
 async function load(){
 
   document
-    .getElementById("updated")
+    .getElementById(
+      "updated"
+    )
     .textContent =
       "Altınkaynak verisi alınıyor…";
 
@@ -942,7 +1083,8 @@ async function load(){
           method:"GET",
           cache:"no-store",
           headers:{
-            "Cache-Control":"no-cache"
+            "Cache-Control":
+              "no-cache"
           }
         }
       );
@@ -967,7 +1109,9 @@ async function load(){
     */
 
     goldProducts =
-      Array.isArray(data.gold)
+      Array.isArray(
+        data.gold
+      )
         ? data.gold
         : [];
 
@@ -977,16 +1121,18 @@ async function load(){
     */
 
     currencyProducts =
-      Array.isArray(data.currency)
+      Array.isArray(
+        data.currency
+      )
         ? data.currency
         : [];
 
 
     /*
-      TÜM FİYATLAR
+      FİYATLAR
     */
 
-    pricesByCode={};
+    pricesByCode = {};
 
 
     const allPrices = [
@@ -998,56 +1144,56 @@ async function load(){
     ];
 
 
-    allPrices.forEach(item=>{
+    allPrices.forEach(
+      item => {
 
-      if(!item.code){
-        return;
+        if(!item.code){
+          return;
+        }
+
+
+        pricesByCode[
+          item.code
+        ] = {
+
+          code:item.code,
+
+          name:item.name,
+
+          buy:Number(
+            item.buy
+          ),
+
+          sell:Number(
+            item.sell
+          ),
+
+          updatedAt:
+            item.updatedAt
+
+        };
+
       }
-
-
-      pricesByCode[item.code]={
-
-        code:item.code,
-
-        name:item.name,
-
-        /*
-          ÖNEMLİ:
-          API'nin gönderdiği BUY değeri
-          doğrudan kullanılıyor.
-
-          Burada sell ile buy
-          birbirine karıştırılmıyor.
-        */
-
-        buy:Number(item.buy),
-
-        sell:Number(item.sell),
-
-        updatedAt:item.updatedAt
-
-      };
-
-    });
+    );
 
 
     /*
-      TL'nin piyasa kuru yok.
-      Ancak portföyde kullanılabilmesi
-      için sanal fiyat oluşturuyoruz.
+      TL
     */
 
-    pricesByCode["TRY"]={
+    pricesByCode["TRY"] = {
 
       code:"TRY",
 
-      name:"Türk Lirası (TL)",
+      name:
+        "Türk Lirası (TL)",
 
       buy:1,
 
       sell:1,
 
-      updatedAt:data.updatedAt
+      updatedAt:
+        data.updatedAt
 
     };
 
@@ -1060,7 +1206,7 @@ async function load(){
 
 
     /*
-      EKRANI GÜNCELLE
+      EKRAN
     */
 
     render();
@@ -1069,7 +1215,7 @@ async function load(){
 
 
     /*
-      SON YENİLEME
+      YENİLEME SAATİ
     */
 
     const now =
@@ -1077,7 +1223,9 @@ async function load(){
 
 
     document
-      .getElementById("time")
+      .getElementById(
+        "time"
+      )
       .textContent =
         now.toLocaleTimeString(
           "tr-TR",
@@ -1090,16 +1238,22 @@ async function load(){
 
 
     document
-      .getElementById("updated")
+      .getElementById(
+        "updated"
+      )
       .textContent =
         data.updatedAt
+
           ? "Altınkaynak güncellemesi: " +
             data.updatedAt
+
           : "Altınkaynak verisi güncel";
 
 
     document
-      .getElementById("live")
+      .getElementById(
+        "live"
+      )
       .textContent =
         "● CANLI";
 
@@ -1113,21 +1267,20 @@ async function load(){
 
 
     document
-      .getElementById("live")
+      .getElementById(
+        "live"
+      )
       .textContent =
         "● BAĞLANTI YOK";
 
 
     document
-      .getElementById("updated")
+      .getElementById(
+        "updated"
+      )
       .textContent =
         "Canlı veri bağlantısı kurulamadı.";
 
-
-    /*
-      API çalışmasa bile
-      mevcut portföyü göster.
-    */
 
     buildAssetOptions();
 
@@ -1148,7 +1301,9 @@ function save(show=true){
 
   localStorage.setItem(
     "altinAssets",
-    JSON.stringify(assets)
+    JSON.stringify(
+      assets
+    )
   );
 
 
@@ -1170,21 +1325,31 @@ function save(show=true){
 function openModal(){
 
   const modal =
-    document.getElementById("modal");
+    document.getElementById(
+      "modal"
+    );
 
 
-  modal.style.display="flex";
+  modal.style.display =
+    "flex";
 
-  document.body.style.overflow="hidden";
+
+  document.body.style.overflow =
+    "hidden";
 
 
-  setTimeout(()=>{
+  setTimeout(
+    () => {
 
-    document
-      .getElementById("qty")
-      .focus();
+      document
+        .getElementById(
+          "qty"
+        )
+        .focus();
 
-  },100);
+    },
+    100
+  );
 
 }
 
@@ -1192,11 +1357,15 @@ function openModal(){
 function closeModal(){
 
   document
-    .getElementById("modal")
-    .style.display="none";
+    .getElementById(
+      "modal"
+    )
+    .style.display =
+      "none";
 
 
-  document.body.style.overflow="";
+  document.body.style.overflow =
+    "";
 
 }
 
@@ -1210,7 +1379,9 @@ function addAsset(){
   const quantity =
     parseFloat(
       document
-        .getElementById("qty")
+        .getElementById(
+          "qty"
+        )
         .value
     );
 
@@ -1231,8 +1402,10 @@ function addAsset(){
 
 
   if(
-    !Number.isFinite(quantity) ||
-    quantity<=0
+    !Number.isFinite(
+      quantity
+    ) ||
+    quantity <= 0
   ){
 
     showToast(
@@ -1248,13 +1421,16 @@ function addAsset(){
     TL
   */
 
-  if(selectedCode === "TRY"){
+  if(
+    selectedCode === "TRY"
+  ){
 
     assets.push({
 
       code:"TRY",
 
-      type:"Türk Lirası (TL)",
+      type:
+        "Türk Lirası (TL)",
 
       qty:quantity
 
@@ -1269,10 +1445,11 @@ function addAsset(){
 
   else{
 
-    const selectedProduct =
+    const selectedGold =
       goldProducts.find(
         item =>
-          item.code === selectedCode
+          item.code ===
+          selectedCode
       );
 
 
@@ -1283,25 +1460,28 @@ function addAsset(){
     const selectedCurrency =
       currencyProducts.find(
         item =>
-          item.code === selectedCode
+          item.code ===
+          selectedCode
       );
 
 
     const selected =
-      selectedProduct ||
+      selectedGold ||
       selectedCurrency;
 
 
     assets.push({
 
-      code:selectedCode,
+      code:
+        selectedCode,
 
       type:
         selected
           ? selected.name
           : selectedCode,
 
-      qty:quantity
+      qty:
+        quantity
 
     });
 
@@ -1314,8 +1494,10 @@ function addAsset(){
 
 
   document
-    .getElementById("qty")
-    .value="";
+    .getElementById(
+      "qty"
+    )
+    .value = "";
 
 
   closeModal();
@@ -1335,20 +1517,28 @@ function addAsset(){
 function showToast(text){
 
   const toast =
-    document
-      .getElementById("toast");
+    document.getElementById(
+      "toast"
+    );
 
 
-  toast.textContent=text;
+  toast.textContent =
+    text;
 
-  toast.style.display="block";
+
+  toast.style.display =
+    "block";
 
 
-  setTimeout(()=>{
+  setTimeout(
+    () => {
 
-    toast.style.display="none";
+      toast.style.display =
+        "none";
 
-  },1800);
+    },
+    1800
+  );
 
 }
 
@@ -1364,7 +1554,7 @@ load();
 
 /*
   Her 30 saniyede
-  Altınkaynak'tan tekrar çek.
+  fiyatları yenile.
 */
 
 setInterval(
