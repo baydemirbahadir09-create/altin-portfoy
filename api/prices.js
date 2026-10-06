@@ -1,8 +1,5 @@
 module.exports = async (req, res) => {
   try {
-    /*
-      Altınkaynak'ın resmi canlı kaynakları
-    */
     const [goldResponse, currencyResponse] =
       await Promise.all([
         fetch("https://static.altinkaynak.com/public/Gold", {
@@ -14,13 +11,11 @@ module.exports = async (req, res) => {
         })
       ]);
 
-
     if (!goldResponse.ok) {
       throw new Error(
         "Gold HTTP " + goldResponse.status
       );
     }
-
 
     if (!currencyResponse.ok) {
       throw new Error(
@@ -28,31 +23,42 @@ module.exports = async (req, res) => {
       );
     }
 
-
     const [gold, currency] =
       await Promise.all([
         goldResponse.json(),
         currencyResponse.json()
       ]);
 
-
     /*
-      Türkçe sayı formatını güvenli şekilde
-      gerçek sayıya çevir.
+      ============================================
+      SAYI DÖNÜŞTÜRME
+      ============================================
 
-      Örnek:
+      Altınkaynak'ta altın fiyatları bazen:
 
-      6.999,50
-      ↓
-      6999.50
+      6.537
+      43.205
+      10.568
+
+      şeklinde geliyor.
+
+      Buradaki nokta BINLİK ayırıcıdır.
+
+      Yani:
+
+      6.537  -> 6537
+      43.205 -> 43205
+      10.568 -> 10568
+
+      Virgüllü değerlerde ise:
+
+      4.167,19 -> 4167.19
     */
 
     function parsePrice(value) {
-
       if (typeof value === "number") {
         return value;
       }
-
 
       if (
         value === null ||
@@ -61,81 +67,80 @@ module.exports = async (req, res) => {
         return null;
       }
 
-
-      let s =
-        String(value)
-          .trim()
-          .replace(/\s/g, "");
-
+      let s = String(value)
+        .trim()
+        .replace(/\s/g, "");
 
       if (!s) {
         return null;
       }
 
-
       /*
         Türkçe format:
 
-        6.999,50
-
-        Nokta = binlik
-        Virgül = ondalık
+        6.537,50
+        6.537
+        88
       */
 
       if (s.includes(",")) {
-
-        s =
-          s
-            .replace(/\./g, "")
-            .replace(",", ".");
-
+        s = s
+          .replace(/\./g, "")
+          .replace(",", ".");
       }
 
+      /*
+        Virgül yoksa ve değer:
 
-      const number =
-        Number(s);
+        6.537
+        43.205
+        10.568
 
+        biçimindeyse noktayı binlik
+        ayırıcı olarak kabul ediyoruz.
+      */
+
+      else if (
+        /^\d{1,3}\.\d{3}$/.test(s)
+      ) {
+        s = s.replace(/\./g, "");
+      }
+
+      const number = Number(s);
 
       return Number.isFinite(number)
         ? number
         : null;
-
     }
 
-
     /*
-      Altınkaynak kayıtlarını temizle.
+      ============================================
+      ALTINKAYNAK KAYITLARINI TEMİZLE
+      ============================================
     */
 
     function clean(items) {
-
       if (!Array.isArray(items)) {
         return [];
       }
 
-
       return items
         .map(item => {
-
           const code =
             item.Kod
               ? String(item.Kod).trim()
               : "";
-
 
           const name =
             item.Aciklama
               ? String(item.Aciklama).trim()
               : "";
 
-
           const buy =
             parsePrice(item.Alis);
 
-
           const sell =
             parsePrice(item.Satis);
-
 
           const updatedAt =
             item.GuncellenmeZamani
@@ -144,162 +149,44 @@ module.exports = async (req, res) => {
                 ).trim()
               : "";
 
-
           return {
-
             code,
-
             name,
-
             buy,
-
             sell,
-
             updatedAt
-
           };
-
         })
         .filter(item =>
-
           item.code &&
           item.name &&
           item.buy !== null &&
           item.sell !== null
-
         );
-
     }
 
-
     /*
+      ============================================
       ALTIN
+      ============================================
     */
 
     const goldData =
       clean(gold);
 
-
     /*
+      ============================================
       DÖVİZ
+      ============================================
     */
 
     const currencyData =
       clean(currency);
 
-
     /*
-      ------------------------------------------------
-      ÖNEMLİ GRAM ALTIN DÜZELTMESİ
-      ------------------------------------------------
-
-      Altınkaynak'ta birden fazla "Gram Altın"
-      kaydı bulunabiliyor.
-
-      Örneğin:
-
-      GA  -> Gram Altın
-      PGA -> Gram Altın
-
-      Biz standart Gram Altın olarak
-      kesinlikle GA kodunu kullanıyoruz.
-
-      Böylece yanlış gram altın kaydının
-      seçilmesini engelliyoruz.
-    */
-
-    const gramGold =
-      goldData.find(
-        item => item.code === "GA"
-      );
-
-
-    /*
-      GA mevcutsa onu koru.
-
-      Eğer ileride GA kaldırılırsa
-      PGA fallback olarak kullanılabilir.
-    */
-
-    if (!gramGold) {
-
-      const fallbackGram =
-        goldData.find(
-          item => item.code === "PGA"
-        );
-
-
-      if (fallbackGram) {
-
-        console.warn(
-          "GA bulunamadı, PGA kullanılıyor."
-        );
-
-      }
-
-    }
-
-
-    /*
-      ------------------------------------------------
-      TÜM FİYATLARI OLUŞTUR
-      ------------------------------------------------
-    */
-
-    const prices = {};
-
-
-    goldData.forEach(item => {
-
-      /*
-        Aynı isimli / benzer ürünlerin
-        birbirinin üzerine yazmasını önlemek
-        için KOD üzerinden kayıt tutuyoruz.
-      */
-
-      prices[item.code] = {
-
-        code: item.code,
-
-        name: item.name,
-
-        buy: item.buy,
-
-        sell: item.sell,
-
-        updatedAt: item.updatedAt
-
-      };
-
-    });
-
-
-    currencyData.forEach(item => {
-
-      prices[item.code] = {
-
-        code: item.code,
-
-        name: item.name,
-
-        buy: item.buy,
-
-        sell: item.sell,
-
-        updatedAt: item.updatedAt
-
-      };
-
-    });
-
-
-    /*
-      ------------------------------------------------
-      SADECE GERÇEKTEN GEREKLİ DÖVİZLER
-      ------------------------------------------------
-
-      USD / EUR / GBP kodlarını özellikle
-      garanti ediyoruz.
+      ============================================
+      SADECE GEREKLİ DÖVİZLER
+      ============================================
     */
 
     const allowedCurrencies = [
@@ -308,20 +195,93 @@ module.exports = async (req, res) => {
       "GBP"
     ];
 
-
     const filteredCurrency =
-      currencyData.filter(
-        item =>
-          allowedCurrencies.includes(
-            item.code
-          )
+      currencyData.filter(item =>
+        allowedCurrencies.includes(
+          item.code
+        )
       );
 
+    /*
+      ============================================
+      GRAM ALTIN
+      ============================================
+
+      Uygulamada standart Gram Altın:
+
+      GA
+
+      kullanılacak.
+
+      PGA gibi ikinci Gram Altın kaydı
+      kullanılmayacak.
+    */
+
+    const gramGold =
+      goldData.find(
+        item => item.code === "GA"
+      );
+
+    if (!gramGold) {
+      throw new Error(
+        "Altınkaynak GA (Gram Altın) verisi bulunamadı."
+      );
+    }
 
     /*
-      ------------------------------------------------
+      ============================================
+      FİYATLAR
+      ============================================
+    */
+
+    const prices = {};
+
+    /*
+      Altınları kodlarına göre oluştur.
+    */
+
+    goldData.forEach(item => {
+      prices[item.code] = {
+        code: item.code,
+        name: item.name,
+        buy: item.buy,
+        sell: item.sell,
+        updatedAt: item.updatedAt
+      };
+    });
+
+    /*
+      Dövizleri ekle.
+    */
+
+    filteredCurrency.forEach(item => {
+      prices[item.code] = {
+        code: item.code,
+        name: item.name,
+        buy: item.buy,
+        sell: item.sell,
+        updatedAt: item.updatedAt
+      };
+    });
+
+    /*
+      ============================================
+      GRAM ALTINI GARANTİ ALTINA AL
+      ============================================
+    */
+
+    prices["GA"] = {
+      code: "GA",
+      name: "Gram Altın",
+      buy: gramGold.buy,
+      sell: gramGold.sell,
+      updatedAt: gramGold.updatedAt
+    };
+
+    /*
+      ============================================
       GÜNCELLEME ZAMANI
-      ------------------------------------------------
+      ============================================
     */
 
     const all = [
@@ -329,29 +289,22 @@ module.exports = async (req, res) => {
       ...filteredCurrency
     ];
 
-
     const updateTimes =
       all
-        .map(
-          item =>
-            item.updatedAt
+        .map(item =>
+          item.updatedAt
         )
         .filter(Boolean);
-
 
     const updatedAt =
       updateTimes.length > 0
         ? updateTimes.sort().at(-1)
         : null;
 
-
     /*
-      ------------------------------------------------
+      ============================================
       CACHE KAPAT
-      ------------------------------------------------
-
-      Vercel'in eski fiyatı göstermesini
-      mümkün olduğunca engelliyoruz.
+      ============================================
     */
 
     res.setHeader(
@@ -359,33 +312,28 @@ module.exports = async (req, res) => {
       "no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0"
     );
 
-
     res.setHeader(
       "CDN-Cache-Control",
       "no-store"
     );
-
 
     res.setHeader(
       "Vercel-CDN-Cache-Control",
       "no-store"
     );
 
-
     res.setHeader(
       "Pragma",
       "no-cache"
     );
 
-
     /*
-      ------------------------------------------------
+      ============================================
       CEVAP
-      ------------------------------------------------
+      ============================================
     */
 
     return res.status(200).json({
-
       source: "Altınkaynak",
 
       updatedAt,
@@ -393,20 +341,10 @@ module.exports = async (req, res) => {
       fetchedAt:
         new Date().toISOString(),
 
-      /*
-        Bütün altın ürünleri
-      */
-
       gold: goldData,
 
-      /*
-        Sadece USD / EUR / GBP
-      */
-
       currency: filteredCurrency
-
     });
-
 
   } catch (error) {
 
@@ -415,15 +353,12 @@ module.exports = async (req, res) => {
       error
     );
 
-
     res.setHeader(
       "Cache-Control",
       "no-store"
     );
 
-
     return res.status(500).json({
-
       source: "Altınkaynak",
 
       error:
@@ -431,8 +366,6 @@ module.exports = async (req, res) => {
 
       message:
         error.message
-
     });
-
   }
 };
